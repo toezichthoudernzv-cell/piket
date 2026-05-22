@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Piket NZV"/>
+<meta name="theme-color" content="#003F72"/>
+<title>Piket App — Noorderzijlvest</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root {
+  --blauw: #003F72;
+  --lichtblauw: #0070B8;
+  --oranje: #E65100;
+  --lichtoranje: #FFF8E1;
+  --rood: #D0021B;
+  --groen: #4CAF50;
+  --bg: #F0F4F8;
+  --wit: #FFFFFF;
+  --grijs: #6B7C8F;
+  --lichtgrijs: #DDE3EA;
+  --tekst: #1A2938;
+  --rand: #C5D0DC;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tekst);min-height:100vh;overscroll-behavior:none;}
+
+.header{background:var(--blauw);color:white;padding:14px 16px 10px;position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,.25);}
+.header-top{display:flex;align-items:center;justify-content:space-between;}
+.header-title{font-size:16px;font-weight:700;}
+.header-sub{font-size:11px;opacity:.75;margin-top:2px;}
+
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1A2938;color:white;padding:10px 20px;border-radius:20px;font-size:13px;z-index:999;display:none;box-shadow:0 4px 12px rgba(0,0,0,.3);}
+
+.content{padding:14px;padding-bottom:100px;max-width:600px;margin:0 auto;}
+
+.card{background:var(--wit);border-radius:12px;padding:16px;margin-bottom:14px;border:1px solid var(--rand);box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.card.oranje-border{border-color:var(--oranje);border-width:2px;}
+.card-title{font-size:12px;font-weight:700;color:var(--blauw);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;}
+.card-title.oranje{color:var(--oranje);}
+
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field label{display:block;font-size:11px;font-weight:600;color:var(--grijs);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px;}
+.field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1.5px solid var(--rand);border-radius:8px;font-size:14px;font-family:inherit;color:var(--tekst);background:var(--wit);}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--lichtblauw);}
+.field textarea{min-height:80px;resize:vertical;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+/* Handhaver knoppen */
+.knop-rij{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;}
+.keuze-btn{padding:8px 12px;border:2px solid var(--rand);border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:var(--wit);font-family:inherit;transition:all .15s;}
+.keuze-btn.selected{border-color:var(--blauw);background:var(--blauw);color:white;}
+.keuze-btn.oranje.selected{border-color:var(--oranje);background:var(--oranje);color:white;}
+
+/* Radio GRIP */
+.grip-rij{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+.grip-btn{flex:1;min-width:60px;padding:9px 6px;border:2px solid var(--rand);border-radius:8px;text-align:center;font-size:13px;font-weight:700;cursor:pointer;background:var(--wit);font-family:inherit;}
+.grip-btn.selected{border-color:var(--oranje);background:var(--lichtoranje);color:var(--oranje);}
+.grip-btn input{display:none;}
+
+/* Afdelingen checkboxes */
+.afd-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;}
+.afd-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid var(--rand);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;background:var(--wit);}
+.afd-item.selected{border-color:var(--blauw);background:#EBF4FF;color:var(--blauw);}
+.afd-item input{display:none;}
+.afd-item .afd-check{width:18px;height:18px;border:2px solid var(--rand);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.afd-item.selected .afd-check{background:var(--blauw);border-color:var(--blauw);color:white;}
+
+/* Benaderd ja/nee */
+.jn-rij{display:flex;gap:10px;margin-top:4px;}
+.jn-btn{flex:1;padding:10px;border:2px solid var(--rand);border-radius:8px;text-align:center;font-size:14px;font-weight:700;cursor:pointer;background:var(--wit);font-family:inherit;}
+.jn-btn.ja.selected{border-color:var(--groen);background:#E8F5E9;color:var(--groen);}
+.jn-btn.nee.selected{border-color:var(--rood);background:#FFEBEE;color:var(--rood);}
+
+/* GPS */
+.gps-row{display:flex;gap:8px;}
+.gps-row input{flex:1;}
+.gps-btn{padding:10px 14px;background:var(--lichtblauw);color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer;flex-shrink:0;}
+.gps-status{font-size:11px;color:var(--grijs);margin-top:4px;}
+
+/* KAART */
+#piket-map{height:250px;border-radius:8px;margin-top:10px;border:1px solid var(--rand);}
+.zoek-rij{display:flex;gap:8px;margin-bottom:8px;}
+.zoek-rij input{flex:1;padding:10px 12px;border:1.5px solid var(--rand);border-radius:8px;font-size:14px;font-family:inherit;}
+.zoek-btn{padding:10px 14px;background:var(--lichtblauw);color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;}
+#kaart-coords{font-size:11px;color:var(--grijs);margin-top:6px;font-family:monospace;}
+
+/* Foto's */
+.foto-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;}
+.foto-item{position:relative;}
+.foto-btn-rij{display:flex;gap:8px;margin-bottom:8px;}
+.foto-btn{flex:1;padding:10px;background:var(--lichtgrijs);border:none;border-radius:8px;font-size:13px;cursor:pointer;color:var(--tekst);font-family:inherit;}
+
+/* Bottom bar */
+.bottom-bar{position:fixed;bottom:0;left:0;right:0;background:var(--wit);border-top:1px solid var(--lichtgrijs);padding:12px 16px;display:flex;gap:10px;z-index:100;}
+.btn-pdf{flex:1;padding:14px;background:var(--oranje);color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;}
+.btn-wis{padding:14px 18px;background:var(--lichtgrijs);color:var(--grijs);border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div class="header-title">🔔 Piket App — NZV</div>
+      <div class="header-sub">Waterschap Noorderzijlvest</div>
+    </div>
+    <div style="font-size:11px;opacity:.7;" id="tijd-display"></div>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- 1. HANDHAVER -->
+  <div class="card">
+    <div class="card-title">👤 Handhaver (piketfunctionaris)</div>
+    <div class="knop-rij">
+      <button class="keuze-btn" onclick="selectKeuze(this,'handhaver','Remko Meijer')">Remko</button>
+      <button class="keuze-btn" onclick="selectKeuze(this,'handhaver','Jan Berends')">Jan B.</button>
+      <button class="keuze-btn" onclick="selectKeuze(this,'handhaver','Klaas Kuiper')">Klaas</button>
+      <button class="keuze-btn" onclick="selectKeuze(this,'handhaver','Jan Willem Zoer')">Jan W.</button>
+      <button class="keuze-btn" onclick="selectKeuze(this,'handhaver','Bob Boonstra')">Bob</button>
+    </div>
+    <input type="hidden" id="handhaver_naam" value=""/>
+  </div>
+
+  <!-- 2. MELDING -->
+  <div class="card oranje-border">
+    <div class="card-title oranje">1. Melding binnengekomen via</div>
+    <div class="field">
+      <label>Kanaal</label>
+      <select id="piket_kanaal">
+        <option value="">— Selecteer —</option>
+        <option>Meldkamer</option>
+        <option>Pricom</option>
+        <option>Telefoon</option>
+        <option>Overige</option>
+      </select>
+    </div>
+    <div class="two-col">
+      <div class="field">
+        <label>Datum melding</label>
+        <input type="date" id="piket_datum_melding"/>
+      </div>
+      <div class="field">
+        <label>Tijdstip melding</label>
+        <input type="time" id="piket_tijdstip_melding"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. CALAMITEIT -->
+  <div class="card">
+    <div class="card-title">2. Soort calamiteit</div>
+    <div class="field">
+      <label>Type</label>
+      <select id="piket_calamiteit" onchange="checkOverig()">
+        <option value="">— Selecteer —</option>
+        <option>Voertuig te water</option>
+        <option>Brand</option>
+        <option>Olie op oppervlaktewater</option>
+        <option>Bodemsanering</option>
+        <option>Persleiding</option>
+        <option>Overige</option>
+      </select>
+    </div>
+    <div class="field" id="overig-veld" style="display:none;">
+      <label>Omschrijving overige calamiteit</label>
+      <input type="text" id="piket_calamiteit_overig" placeholder="Omschrijf de calamiteit..."/>
+    </div>
+    <div class="field">
+      <label>Beschrijving situatie (WAT is er gebeurd)</label>
+      <textarea id="piket_omschrijving" placeholder="Beschrijf de situatie zo volledig mogelijk..."></textarea>
+    </div>
+  </div>
+
+  <!-- 4. LOCATIE + KAART -->
+  <div class="card">
+    <div class="card-title">3. Locatie calamiteit</div>
+    <div class="field">
+      <label>Zoek adres op kaart</label>
+      <div class="zoek-rij">
+        <input type="text" id="kaart-zoek" placeholder="Zoek adres of plaatsnaam..." onkeydown="if(event.key==='Enter')zoekOpKaart()"/>
+        <button class="zoek-btn" onclick="zoekOpKaart()">🔍 Zoek</button>
+      </div>
+    </div>
+    <div id="piket-map"></div>
+    <div id="kaart-coords">📍 Klik op de kaart om locatie te markeren</div>
+    <div class="field" style="margin-top:10px;">
+      <label>Adres / Omschrijving locatie</label>
+      <div class="gps-row">
+        <input type="text" id="piket_locatie" placeholder="Adres of omschrijving"/>
+        <button class="gps-btn" id="piket_gps_btn" onclick="getGPSpiket()" data-bezig="false">📡</button>
+      </div>
+      <div class="gps-status" id="piket_gps_status"></div>
+    </div>
+    <div class="two-col">
+      <div class="field">
+        <label>Datum ter plaatse</label>
+        <input type="date" id="piket_datum_plaatse"/>
+      </div>
+      <div class="field">
+        <label>Tijdstip ter plaatse</label>
+        <input type="time" id="piket_tijdstip_plaatse"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. GRIP -->
+  <div class="card">
+    <div class="card-title">4. GRIP niveau</div>
+    <div class="grip-rij">
+      <label class="grip-btn" onclick="selectGrip(this)"><input type="radio" name="piket_grip" value="Geen"/>Geen</label>
+      <label class="grip-btn" onclick="selectGrip(this)"><input type="radio" name="piket_grip" value="GRIP 1"/>GRIP 1</label>
+      <label class="grip-btn" onclick="selectGrip(this)"><input type="radio" name="piket_grip" value="GRIP 2"/>GRIP 2</label>
+      <label class="grip-btn" onclick="selectGrip(this)"><input type="radio" name="piket_grip" value="GRIP 3"/>GRIP 3</label>
+    </div>
+  </div>
+
+  <!-- 6. WAT / WOT LEIDER -->
+  <div class="card">
+    <div class="card-title">5. WAT / WOT leider</div>
+    <div class="two-col">
+      <div class="field">
+        <label>WAT leider (naam)</label>
+        <input type="text" id="wat_leider" placeholder="Naam WAT leider"/>
+      </div>
+      <div class="field">
+        <label>WOT leider (naam)</label>
+        <input type="text" id="wot_leider" placeholder="Naam WOT leider"/>
+      </div>
+    </div>
+    <div class="field">
+      <label>Benaderd?</label>
+      <div class="jn-rij">
+        <button class="jn-btn ja" onclick="selectBenaderd(this,'Ja')">✅ Ja</button>
+        <button class="jn-btn nee" onclick="selectBenaderd(this,'Nee')">❌ Nee</button>
+      </div>
+      <input type="hidden" id="benaderd_waarde" value=""/>
+    </div>
+  </div>
+
+  <!-- 7. CONTACTEN -->
+  <div class="card">
+    <div class="card-title">6. OvD / Contactpersoon</div>
+    <div class="field">
+      <label>Naam OvD</label>
+      <input type="text" id="piket_ovd" placeholder="Naam officier van dienst"/>
+    </div>
+    <div class="field">
+      <label>Andere contactpersoon (optioneel)</label>
+      <input type="text" id="piket_contact" placeholder="Naam en functie"/>
+    </div>
+  </div>
+
+  <!-- 8. INGEZETTE AFDELINGEN -->
+  <div class="card">
+    <div class="card-title">7. Ingezette afdelingen</div>
+    <div class="afd-grid" id="afd-grid">
+      <div class="afd-item" onclick="toggleAfd(this,'Storingsdienst RWZI West')">
+        <div class="afd-check">✓</div><span>RWZI West</span>
+      </div>
+      <div class="afd-item" onclick="toggleAfd(this,'Storingsdienst RWZI Oost')">
+        <div class="afd-check">✓</div><span>RWZI Oost</span>
+      </div>
+      <div class="afd-item" onclick="toggleAfd(this,'Storingsdienst RWZI Zuid')">
+        <div class="afd-check">✓</div><span>RWZI Zuid</span>
+      </div>
+      <div class="afd-item" onclick="toggleAfd(this,'Rioolgemalen')">
+        <div class="afd-check">✓</div><span>Rioolgemalen</span>
+      </div>
+      <div class="afd-item" onclick="toggleAfd(this,'Operationeel Watersysteem')">
+        <div class="afd-check">✓</div><span>Op. Watersysteem</span>
+      </div>
+      <div class="afd-item" onclick="toggleAfd(this,'Kwaliteitsobjecten Zuid')">
+        <div class="afd-check">✓</div><span>Kwaliteit Zuid</span>
+      </div>
+      <div class="afd-item" onclick="toggleAfd(this,'Kwaliteitsobjecten Noord')">
+        <div class="afd-check">✓</div><span>Kwaliteit Noord</span>
+      </div>
+      <div class="afd-item" onclick="toggleAfd(this,'__overig__')">
+        <div class="afd-check">✓</div><span>Andere afdeling</span>
+      </div>
+    </div>
+    <div class="field" id="afd-overig-veld" style="display:none;margin-top:10px;">
+      <label>Welke andere afdeling?</label>
+      <input type="text" id="afd_overig" placeholder="Naam afdeling..."/>
+    </div>
+  </div>
+
+  <!-- 9. FOTOS -->
+  <div class="card">
+    <div class="card-title">8. Foto's</div>
+    <div class="foto-btn-rij">
+      <button class="foto-btn" onclick="document.getElementById('foto-camera').click()">📷 Camera</button>
+      <button class="foto-btn" onclick="document.getElementById('foto-bestand').click()">🖼 Bestand</button>
+    </div>
+    <input type="file" id="foto-camera" accept="image/*" capture="environment" style="display:none" onchange="handlePiketFotos(event)"/>
+    <input type="file" id="foto-bestand" accept="image/*" multiple style="display:none" onchange="handlePiketFotos(event)"/>
+    <div class="foto-grid" id="piketFotoGrid"></div>
+  </div>
+
+  <!-- 10. OPMERKING -->
+  <div class="card">
+    <div class="card-title">9. Opmerking</div>
+    <div class="field">
+      <textarea id="piket_opmerking" placeholder="Aanvullende opmerkingen..."></textarea>
+    </div>
+  </div>
+
+</div>
+
+<div class="bottom-bar">
+  <button class="btn-wis" onclick="wisAlles()">🗑 Wis</button>
+  <button class="btn-pdf" onclick="downloadPiketPDF()">⬇️ PDF Piketrapport</button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════
+//  STATE
+// ═══════════════════════════════════
+let piketFotos = [];
+let piketMarker = null;
+let piketLat = null, piketLon = null;
+let geselecteerdeAfdelingen = new Set();
+
+// ═══════════════════════════════════
+//  KAART
+// ═══════════════════════════════════
+const piketMap = L.map('piket-map', {
+  tap: true, tapTolerance: 15, zoomControl: true
+}).setView([53.15, 6.55], 11);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19
+}).addTo(piketMap);
+
+piketMap.on('click', (e) => {
+  const {lat, lng} = e.latlng;
+  piketLat = lat.toFixed(6);
+  piketLon = lng.toFixed(6);
+  zetMarker(lat, lng);
+  document.getElementById('kaart-coords').textContent = `📍 ${piketLat}, ${piketLon}`;
+  // Reverse geocode
+  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+    .then(r => r.json())
+    .then(d => {
+      const a = d.address || {};
+      const adres = [a.road||'', a.house_number||'', a.city||a.town||a.village||''].filter(Boolean).join(' ');
+      if (adres) document.getElementById('piket_locatie').value = adres;
+      document.getElementById('kaart-coords').textContent = `📍 ${piketLat}, ${piketLon} — ${adres}`;
+    }).catch(() => {});
+});
+
+function zetMarker(lat, lng) {
+  if (piketMarker) piketMap.removeLayer(piketMarker);
+  piketMarker = L.marker([lat, lng], {
+    icon: L.divIcon({
+      html: `<div style="width:20px;height:20px;background:#E65100;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,.4);"></div>`,
+      iconSize: [20, 20], iconAnchor: [10, 10], className: ''
+    })
+  }).addTo(piketMap);
+}
+
+async function zoekOpKaart() {
+  const q = document.getElementById('kaart-zoek').value.trim();
+  if (!q) return;
+  document.getElementById('kaart-coords').textContent = '🔍 Zoeken...';
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&countrycodes=nl`);
+    const d = await r.json();
+    if (d && d[0]) {
+      const lat = parseFloat(d[0].lat), lng = parseFloat(d[0].lon);
+      piketLat = lat.toFixed(6); piketLon = lng.toFixed(6);
+      piketMap.setView([lat, lng], 15, {animate: true});
+      zetMarker(lat, lng);
+      document.getElementById('piket_locatie').value = d[0].display_name.split(',').slice(0,3).join(',').trim();
+      document.getElementById('kaart-coords').textContent = `📍 ${piketLat}, ${piketLon}`;
+    } else {
+      document.getElementById('kaart-coords').textContent = '⚠️ Adres niet gevonden';
+    }
+  } catch(e) {
+    document.getElementById('kaart-coords').textContent = '⚠️ Zoeken mislukt';
+  }
+}
+
+// ═══════════════════════════════════
+//  INIT
+// ═══════════════════════════════════
+window.addEventListener('load', () => {
+  const now = new Date();
+  const ds = now.toISOString().split('T')[0];
+  const ts = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('piket_datum_melding').value = ds;
+  document.getElementById('piket_tijdstip_melding').value = ts;
+  document.getElementById('piket_datum_plaatse').value = ds;
+  document.getElementById('piket_tijdstip_plaatse').value = ts;
+  setInterval(() => {
+    const n = new Date();
+    document.getElementById('tijd-display').textContent =
+      n.toLocaleDateString('nl-NL') + ' ' + n.toLocaleTimeString('nl-NL', {hour:'2-digit', minute:'2-digit'});
+  }, 1000);
+});
+
+// ═══════════════════════════════════
+//  UI HELPERS
+// ═══════════════════════════════════
+function selectKeuze(btn, groep, waarde) {
+  btn.closest('.card').querySelectorAll('.keuze-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById(groep + '_naam').value = waarde;
+}
+
+function selectGrip(label) {
+  document.querySelectorAll('.grip-btn').forEach(l => l.classList.remove('selected'));
+  label.classList.add('selected');
+  label.querySelector('input').checked = true;
+}
+
+function selectBenaderd(btn, waarde) {
+  document.querySelectorAll('.jn-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('benaderd_waarde').value = waarde;
+}
+
+function toggleAfd(el, waarde) {
+  if (waarde === '__overig__') {
+    el.classList.toggle('selected');
+    const toon = el.classList.contains('selected');
+    document.getElementById('afd-overig-veld').style.display = toon ? 'block' : 'none';
+    if (toon) geselecteerdeAfdelingen.add('__overig__');
+    else geselecteerdeAfdelingen.delete('__overig__');
+  } else {
+    el.classList.toggle('selected');
+    if (el.classList.contains('selected')) geselecteerdeAfdelingen.add(waarde);
+    else geselecteerdeAfdelingen.delete(waarde);
+  }
+}
+
+function checkOverig() {
+  const v = document.getElementById('piket_calamiteit').value;
+  document.getElementById('overig-veld').style.display = v === 'Overige' ? 'block' : 'none';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+
+function wisAlles() {
+  if (!confirm('Weet je zeker dat je alles wil wissen?')) return;
+  document.querySelectorAll('input:not([type=radio]):not([type=file]):not([type=hidden]),select,textarea').forEach(el => el.value = '');
+  document.querySelectorAll('.keuze-btn,.grip-btn,.jn-btn,.afd-item').forEach(b => b.classList.remove('selected'));
+  document.getElementById('handhaver_naam').value = '';
+  document.getElementById('benaderd_waarde').value = '';
+  geselecteerdeAfdelingen.clear();
+  document.getElementById('afd-overig-veld').style.display = 'none';
+  document.getElementById('overig-veld').style.display = 'none';
+  piketFotos = []; renderPiketFotos();
+  if (piketMarker) { piketMap.removeLayer(piketMarker); piketMarker = null; }
+  piketLat = null; piketLon = null;
+  document.getElementById('kaart-coords').textContent = '📍 Klik op de kaart om locatie te markeren';
+  const now = new Date();
+  const ds = now.toISOString().split('T')[0];
+  const ts = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('piket_datum_melding').value = ds;
+  document.getElementById('piket_tijdstip_melding').value = ts;
+  document.getElementById('piket_datum_plaatse').value = ds;
+  document.getElementById('piket_tijdstip_plaatse').value = ts;
+  showToast('🗑 Formulier gewist');
+}
+
+// ═══════════════════════════════════
+//  FOTOS
+// ═══════════════════════════════════
+function handlePiketFotos(event) {
+  Array.from(event.target.files).forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => { piketFotos.push({dataUrl: e.target.result}); renderPiketFotos(); };
+    reader.readAsDataURL(file);
+  });
+  event.target.value = '';
+}
+
+function renderPiketFotos() {
+  const grid = document.getElementById('piketFotoGrid');
+  grid.innerHTML = piketFotos.map((f, i) => `
+    <div class="foto-item">
+      <img src="${f.dataUrl}" style="width:100%;height:80px;object-fit:cover;border-radius:8px;">
+      <button onclick="verwijderPiketFoto(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);color:white;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;">✕</button>
+    </div>`).join('');
+}
+
+function verwijderPiketFoto(i) { piketFotos.splice(i, 1); renderPiketFotos(); }
+
+// ═══════════════════════════════════
+//  GPS
+// ═══════════════════════════════════
+function getGPSpiket() {
+  const btn = document.getElementById('piket_gps_btn');
+  const status = document.getElementById('piket_gps_status');
+  if (btn.dataset.bezig === 'true') { btn.dataset.bezig='false'; btn.textContent='📡'; status.textContent='GPS geannuleerd.'; return; }
+  btn.dataset.bezig = 'true'; btn.textContent = '✕'; status.textContent = '📡 GPS bepalen...';
+  navigator.geolocation.getCurrentPosition(pos => {
+    btn.dataset.bezig = 'false'; btn.textContent = '📡';
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    const acc = Math.round(pos.coords.accuracy);
+    piketLat = lat.toFixed(6); piketLon = lng.toFixed(6);
+    piketMap.setView([lat, lng], 15, {animate: true});
+    zetMarker(lat, lng);
+    document.getElementById('kaart-coords').textContent = `📍 ${piketLat}, ${piketLon} (±${acc}m)`;
+    status.textContent = '✅ GPS vastgelegd (±' + acc + 'm) · Adres ophalen...';
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+      .then(r => r.json())
+      .then(d => {
+        const a = d.address || {};
+        const adres = [a.road||'', a.house_number||'', a.city||a.town||a.village||''].filter(Boolean).join(' ');
+        if (adres) document.getElementById('piket_locatie').value = adres;
+        status.textContent = '✅ Locatie ingevuld (±' + acc + 'm)';
+      }).catch(() => { status.textContent = '✅ GPS vastgelegd (±' + acc + 'm)'; });
+  }, () => { btn.dataset.bezig='false'; btn.textContent='📡'; status.textContent='⚠️ GPS niet beschikbaar'; },
+  {enableHighAccuracy: false, timeout: 10000, maximumAge: 30000});
+}
+
+// ═══════════════════════════════════
+//  PDF
+// ═══════════════════════════════════
+function downloadPiketPDF() {
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({unit:'mm', format:'a4'});
+  const blauw=[0,63,114], oranje=[230,81,0], grijs=[107,124,143];
+
+  // Header
+  doc.setFillColor(...blauw);
+  doc.rect(0,0,210,28,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(14);
+  doc.text('Waterschap Noorderzijlvest',14,11);
+  doc.setFontSize(10);
+  doc.setFont('helvetica','normal');
+  doc.text('Piketrapport calamiteit',14,19);
+  const now = new Date();
+  doc.setFontSize(8);
+  doc.text(now.toLocaleDateString('nl-NL')+' '+now.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}),196,19,{align:'right'});
+
+  let y = 36;
+  doc.setTextColor(0,0,0);
+
+  function addSection(titel) {
+    if(y>260){doc.addPage();y=20;}
+    doc.setFillColor(...oranje);
+    doc.rect(14,y,182,7,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(9);
+    doc.text(titel,17,y+5);
+    doc.setTextColor(0,0,0);
+    doc.setFont('helvetica','normal');
+    y+=10;
+  }
+
+  function addRow(label, waarde) {
+    if(!waarde)return;
+    if(y>270){doc.addPage();y=20;}
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...grijs);
+    doc.text(label,14,y);
+    doc.setFont('helvetica','normal');
+    doc.setTextColor(0,0,0);
+    doc.setFontSize(9);
+    const lijnen=doc.splitTextToSize(String(waarde),120);
+    doc.text(lijnen,75,y);
+    y+=lijnen.length*5+2;
+  }
+
+  addSection('PIKETMELDING');
+  addRow('Handhaver', document.getElementById('handhaver_naam').value);
+  addRow('Melding via', document.getElementById('piket_kanaal').value);
+  addRow('Datum melding', document.getElementById('piket_datum_melding').value);
+  addRow('Tijdstip melding', document.getElementById('piket_tijdstip_melding').value);
+  addRow('Datum ter plaatse', document.getElementById('piket_datum_plaatse').value);
+  addRow('Tijdstip ter plaatse', document.getElementById('piket_tijdstip_plaatse').value);
+
+  addSection('CALAMITEIT');
+  const grip = document.querySelector('input[name="piket_grip"]:checked');
+  addRow('GRIP niveau', grip ? grip.value : '');
+  const cal = document.getElementById('piket_calamiteit').value;
+  const calOverig = document.getElementById('piket_calamiteit_overig').value;
+  addRow('Soort calamiteit', cal==='Overige'&&calOverig ? 'Overige: '+calOverig : cal);
+  addRow('Omschrijving', document.getElementById('piket_omschrijving').value);
+  addRow('Locatie', document.getElementById('piket_locatie').value);
+  if(piketLat&&piketLon) addRow('Coördinaten', `${piketLat}, ${piketLon}`);
+
+  addSection('WAT / WOT LEIDER');
+  addRow('WAT leider', document.getElementById('wat_leider').value);
+  addRow('WOT leider', document.getElementById('wot_leider').value);
+  addRow('Benaderd', document.getElementById('benaderd_waarde').value);
+
+  addSection('CONTACTEN');
+  addRow('OvD', document.getElementById('piket_ovd').value);
+  addRow('Contactpersoon', document.getElementById('piket_contact').value);
+
+  // Afdelingen
+  const afdLijst = [];
+  geselecteerdeAfdelingen.forEach(a => {
+    if(a==='__overig__') {
+      const ov = document.getElementById('afd_overig').value;
+      if(ov) afdLijst.push(ov);
+    } else { afdLijst.push(a); }
+  });
+  if(afdLijst.length>0) {
+    addSection('INGEZETTE AFDELINGEN');
+    afdLijst.forEach(a => addRow('•', a));
+  }
+
+  const opm = document.getElementById('piket_opmerking').value;
+  if(opm) {
+    addSection('OPMERKINGEN');
+    const lijnen=doc.splitTextToSize(opm,175);
+    doc.setFontSize(9);
+    lijnen.forEach(l=>{if(y>270){doc.addPage();y=20;}doc.text(l,14,y);y+=5;});
+    y+=3;
+  }
+
+  if(piketFotos.length>0) {
+    addSection("FOTO'S");
+    let x=14;
+    piketFotos.forEach(f=>{
+      if(x+58>196){x=14;y+=48;}
+      if(y>250){doc.addPage();y=20;x=14;}
+      try{doc.addImage(f.dataUrl,'JPEG',x,y,55,40);}catch(e){}
+      x+=60;
+    });
+    y+=48;
+  }
+
+  doc.setFontSize(7);
+  doc.setTextColor(...grijs);
+  doc.text('Waterschap Noorderzijlvest — Piketrapport',14,290);
+  doc.text(now.toLocaleDateString('nl-NL'),196,290,{align:'right'});
+
+  const datum = document.getElementById('piket_datum_plaatse').value || now.toISOString().split('T')[0];
+  doc.save('piketrapport_'+datum+'.pdf');
+  showToast('✅ Piketrapport gedownload!');
+}
+</script>
+</body>
+</html>
