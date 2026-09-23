@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Piket App NZV</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --blauw:#0B4F8A; --blauw-d:#083A66; --oranje:#E07800; --oranje-l:#FFF3E0;
+    --groenblauw:#0072B2; --bg:#F2F6FA; --kaart:#FFFFFF; --lijn:#D6E1EC;
+    --tekst:#1A2733; --grijs:#5B6B7A; --rood:#B0300F;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{margin:0; font-family:-apple-system,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--tekst); padding-bottom:40px;}
+  header{background:var(--blauw); color:#fff; padding:14px 16px; position:sticky; top:0; z-index:50; box-shadow:0 2px 8px rgba(0,0,0,.2);}
+  header h1{margin:0; font-size:19px; display:flex; align-items:center; gap:8px;}
+  #offlineBadge{display:none; background:var(--oranje); color:#fff; font-size:12px; font-weight:700; padding:2px 8px; border-radius:10px;}
+  .wrap{max-width:680px; margin:0 auto; padding:12px;}
+
+  /* Dienst band */
+  .dienstband{border-radius:12px; padding:14px; margin-bottom:14px; border:2px solid var(--lijn); background:var(--kaart);}
+  .dienstband.actief{border-color:var(--blauw); background:#E8F1FA;}
+  .dienstband .status{font-size:15px; font-weight:700;}
+  .dienstband .sub{font-size:13px; color:var(--grijs); margin-top:2px;}
+  .dienstband .tellers{display:flex; gap:10px; margin-top:10px;}
+  .teller{flex:1; background:#fff; border:1px solid var(--lijn); border-radius:8px; padding:8px; text-align:center;}
+  .teller b{display:block; font-size:22px;}
+  .teller span{font-size:11px; color:var(--grijs); text-transform:uppercase; letter-spacing:.5px;}
+
+  .btn{display:block; width:100%; padding:14px; border:none; border-radius:10px; font-size:16px; font-weight:700; cursor:pointer; text-align:center;}
+  .btn-blauw{background:var(--blauw); color:#fff;}
+  .btn-oranje{background:var(--oranje); color:#fff;}
+  .btn-wit{background:#fff; color:var(--blauw); border:2px solid var(--blauw);}
+  .btn-klein{padding:9px 12px; font-size:14px; width:auto; display:inline-block;}
+  .btn:active{opacity:.8;}
+  .btn:disabled{opacity:.45; cursor:default;}
+
+  .kaartje{background:var(--kaart); border:1px solid var(--lijn); border-radius:12px; padding:14px; margin-bottom:14px;}
+  .kaartje h2{margin:0 0 10px; font-size:16px; color:var(--blauw);}
+  label.veld{display:block; font-size:13px; font-weight:700; color:var(--grijs); margin:12px 0 5px; text-transform:uppercase; letter-spacing:.4px;}
+  input[type=text], input[type=datetime-local], textarea{width:100%; padding:11px; font-size:16px; border:1.5px solid var(--lijn); border-radius:8px; background:#fff; font-family:inherit;}
+  textarea{min-height:70px; resize:vertical;}
+  input:focus, textarea:focus{outline:2px solid var(--blauw); border-color:var(--blauw);}
+
+  /* Soort-tegels: kern van de app */
+  .tegels{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .tegel{border:2px solid var(--lijn); background:#fff; border-radius:10px; padding:12px 8px; font-size:14px; font-weight:700; text-align:center; cursor:pointer; color:var(--tekst);}
+  .tegel .em{display:block; font-size:24px; margin-bottom:4px;}
+  .tegel.aan{border-color:var(--blauw); background:#E8F1FA; color:var(--blauw);}
+  .griprij{display:none; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px;}
+  .griprij.zichtbaar{display:grid;}
+  .gripknop{border:2px solid var(--lijn); background:#fff; border-radius:8px; padding:10px 4px; font-size:13px; font-weight:700; cursor:pointer;}
+  .gripknop.aan{border-color:var(--oranje); background:var(--oranje-l); color:var(--oranje);}
+
+  .melderrij{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
+  .melderknop{border:2px solid var(--lijn); background:#fff; border-radius:8px; padding:10px 4px; font-size:13px; font-weight:700; cursor:pointer;}
+  .melderknop.aan{border-color:var(--blauw); background:#E8F1FA; color:var(--blauw);}
+
+  .gpsrij{display:flex; gap:8px; align-items:stretch;}
+  .gpsrij input{flex:1;}
+  #gpsInfo{font-size:12px; color:var(--grijs); margin-top:4px; min-height:16px;}
+
+  .statuswissel{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .statusknop{border:2px solid var(--lijn); background:#fff; border-radius:8px; padding:12px; font-size:15px; font-weight:700; cursor:pointer;}
+  .statusknop.open.aan{border-color:var(--oranje); background:var(--oranje-l); color:var(--oranje);}
+  .statusknop.dicht.aan{border-color:var(--groenblauw); background:#E3F0F8; color:var(--groenblauw);}
+
+  .fotorij{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
+  .fotorij .thumb{position:relative; width:72px; height:72px; border-radius:8px; overflow:hidden; border:1px solid var(--lijn);}
+  .fotorij img{width:100%; height:100%; object-fit:cover;}
+  .thumb .weg{position:absolute; top:2px; right:2px; background:rgba(176,48,15,.9); color:#fff; border:none; border-radius:50%; width:22px; height:22px; font-size:13px; font-weight:700; cursor:pointer; line-height:1;}
+
+  /* Meldinglijst */
+  .melding{background:var(--kaart); border:1px solid var(--lijn); border-left:6px solid var(--blauw); border-radius:10px; padding:12px; margin-bottom:10px;}
+  .melding.isopen{border-left-color:var(--oranje);}
+  .melding .kop{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+  .melding .soort{font-weight:800; font-size:15px;}
+  .melding .tijd{font-size:13px; color:var(--grijs);}
+  .badge{font-size:12px; font-weight:800; padding:4px 9px; border-radius:12px; white-space:nowrap;}
+  .badge.open{background:var(--oranje-l); color:var(--oranje); border:1.5px solid var(--oranje);}
+  .badge.dicht{background:#E3F0F8; color:var(--groenblauw); border:1.5px solid var(--groenblauw);}
+  .melding .regel{font-size:14px; margin-top:6px;}
+  .melding .regel b{color:var(--grijs); font-size:12px; text-transform:uppercase; letter-spacing:.4px;}
+  .melding .acties{display:flex; gap:8px; margin-top:10px;}
+  .melding .acties button{flex:1; padding:9px; border-radius:8px; border:1.5px solid var(--lijn); background:#fff; font-size:14px; font-weight:700; cursor:pointer;}
+  .melding .acties .afh{border-color:var(--groenblauw); color:var(--groenblauw);}
+  .melding .acties .her{border-color:var(--oranje); color:var(--oranje);}
+  .melding .acties .del{border-color:var(--rood); color:var(--rood);}
+  .melding .minifotos{display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;}
+  .melding .minifotos img{width:56px; height:56px; object-fit:cover; border-radius:6px; border:1px solid var(--lijn);}
+
+  .leeg{text-align:center; color:var(--grijs); padding:24px 12px; font-size:14px;}
+  .archiefitem{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid var(--lijn); font-size:14px;}
+  .archiefitem:last-child{border-bottom:none;}
+  .archiefitem .knopjes{display:flex; gap:6px;}
+  .archiefitem button{padding:7px 10px; border-radius:7px; border:1.5px solid var(--blauw); background:#fff; color:var(--blauw); font-weight:700; font-size:13px; cursor:pointer;}
+  .archiefitem button.del{border-color:var(--rood); color:var(--rood);}
+  #meldFormWrap{display:none;}
+  .melding-count{font-size:13px; color:var(--grijs); margin-bottom:8px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>🚨 Piket App NZV <span id="offlineBadge">⚠ OFFLINE</span></h1>
+</header>
+
+<div class="wrap">
+
+  <!-- DIENST -->
+  <div class="dienstband" id="dienstband">
+    <div class="status" id="dienstStatus">Geen actieve piketdienst</div>
+    <div class="sub" id="dienstSub"></div>
+    <div class="tellers" id="dienstTellers" style="display:none">
+      <div class="teller"><b id="tTotaal">0</b><span>Meldingen</span></div>
+      <div class="teller"><b id="tOpen" style="color:var(--oranje)">0</b><span>⚠ Open</span></div>
+      <div class="teller"><b id="tDicht" style="color:var(--groenblauw)">0</b><span>✓ Afgehandeld</span></div>
+    </div>
+    <div style="margin-top:12px">
+      <button class="btn btn-blauw" id="dienstKnop" onclick="wisselDienst()">▶ Start piketdienst</button>
+    </div>
+  </div>
+
+  <!-- NIEUWE MELDING KNOP -->
+  <button class="btn btn-oranje" id="nieuwKnop" onclick="openForm()" style="display:none; margin-bottom:14px">＋ Nieuwe melding</button>
+
+  <!-- FORMULIER -->
+  <div class="kaartje" id="meldFormWrap">
+    <h2 id="formTitel">Nieuwe melding</h2>
+
+    <label class="veld">Datum &amp; tijd melding</label>
+    <input type="datetime-local" id="mTijd">
+
+    <label class="veld">Soort incident</label>
+    <div class="tegels" id="soortTegels">
+      <button class="tegel" data-soort="Brand"><span class="em">🔥</span>Brand</button>
+      <button class="tegel" data-soort="Voertuig in sloot"><span class="em">🚗</span>Voertuig in sloot</button>
+      <button class="tegel" data-soort="Vloeistof op oppervlaktewater"><span class="em">🛢️</span>Vloeistof op oppervlaktewater</button>
+      <button class="tegel" data-soort="Dode dieren in water"><span class="em">🦆</span>Dode dieren in water</button>
+      <button class="tegel" data-soort="Persleiding kapot"><span class="em">🔧</span>Persleiding kapot</button>
+      <button class="tegel" data-soort="Bentoniet uitbraak"><span class="em">🕳️</span>Bentoniet uitbraak</button>
+      <button class="tegel" data-soort="Overige" style="grid-column:1 / -1"><span class="em">📋</span>Overige</button>
+    </div>
+    <input type="text" id="overigeVeld" placeholder="Omschrijving incident..." style="display:none; margin-top:8px">
+
+    <label class="veld">GRIP-opschaling</label>
+    <div class="griprij zichtbaar" id="gripRij">
+      <button class="gripknop" data-grip="">Geen GRIP</button>
+      <button class="gripknop" data-grip="GRIP 1">GRIP 1</button>
+      <button class="gripknop" data-grip="GRIP 2">GRIP 2</button>
+      <button class="gripknop" data-grip="GRIP 3">GRIP 3</button>
+    </div>
+    <div id="gripHint" style="display:none; margin-top:8px; background:var(--oranje-l); border:1.5px solid var(--oranje); color:var(--oranje); border-radius:8px; padding:9px; font-size:13px; font-weight:700">⚠ GRIP-melding: aanwezigheid waterschap verplicht (ook bij GRIP 1)</div>
+
+    <div id="opschalingBlok" style="display:none">
+      <label class="veld">Opschaling binnen waterschap</label>
+      <div class="melderrij" id="opschalingRij" style="grid-template-columns:repeat(3,1fr)">
+        <button class="melderknop aan" data-opschaling="">Geen</button>
+        <button class="melderknop" data-opschaling="WAT-leider">WAT-leider</button>
+        <button class="melderknop" data-opschaling="WOT-leider">WOT-leider</button>
+      </div>
+      <input type="text" id="mOpschalingNaam" placeholder="Naam WAT/WOT-leider..." style="display:none; margin-top:8px">
+    </div>
+
+    <label class="veld" id="contactLabel">Gesproken met</label>
+    <input type="text" id="mContact" placeholder="Naam en functie...">
+    <label class="veld">Telefoonnummer contactpersoon</label>
+    <input type="text" id="mContactTel" placeholder="06-...">
+    <label class="veld">Locatie</label>
+    <div class="gpsrij">
+      <input type="text" id="mLocatie" placeholder="Adres of omschrijving...">
+      <button class="btn btn-blauw btn-klein" id="gpsKnop" onclick="pakGPS()">📍 GPS</button>
+    </div>
+    <div id="gpsInfo"></div>
+    <a href="https://www.google.com/maps" target="_blank" rel="noopener" style="font-size:12px; color:var(--blauw); display:inline-block; margin-top:2px">Kies via kaart (Google Maps) →</a>
+
+    <label class="veld">Gemeld door</label>
+    <div class="melderrij" id="melderRij">
+      <button class="melderknop" data-melder="Pricon">Pricon</button>
+      <button class="melderknop" data-melder="Meldkamer">Meldkamer</button>
+      <button class="melderknop" data-melder="Frontoffice">Frontoffice</button>
+      <button class="melderknop" data-melder="Anders">Anders</button>
+    </div>
+
+    <label class="veld">Ondernomen actie / notitie</label>
+    <textarea id="mActie" placeholder="Wat is er gedaan of afgesproken..."></textarea>
+
+    <label class="veld">Verantwoordelijke / veroorzaker</label>
+    <div class="melderrij" id="veroorzakerRij">
+      <button class="melderknop" data-ver="Gemeente">Gemeente</button>
+      <button class="melderknop" data-ver="Provincie">Provincie</button>
+      <button class="melderknop" data-ver="Boer">Boer</button>
+      <button class="melderknop" data-ver="Anders">Anders</button>
+    </div>
+    <input type="text" id="mVeroorzakerInfo" placeholder="Naam / toelichting veroorzaker..." style="display:none; margin-top:8px">
+    <label style="display:flex; gap:10px; align-items:center; margin-top:12px; font-size:14px; font-weight:700; cursor:pointer">
+      <input type="checkbox" id="mVerontreiniging" style="width:24px; height:24px; flex-shrink:0">
+      <span>Verontreiniging oppervlaktewater — veroorzaker moet schade herstellen</span>
+    </label>
+
+    <label class="veld">Foto's</label>
+    <button class="btn btn-wit btn-klein" onclick="document.getElementById('fotoInput').click()">📷 Foto toevoegen</button>
+    <input type="file" id="fotoInput" accept="image/*" multiple style="display:none" onchange="fotosToevoegen(this.files)">
+    <div class="fotorij" id="fotoRij"></div>
+
+    <label class="veld">Status</label>
+    <div class="statuswissel">
+      <button class="statusknop open" data-status="open">⚠ OPEN</button>
+      <button class="statusknop dicht" data-status="afgehandeld">✓ AFGEHANDELD</button>
+    </div>
+
+    <div style="display:flex; gap:8px; margin-top:16px">
+      <button class="btn btn-wit" style="flex:1" onclick="sluitForm()">Annuleren</button>
+      <button class="btn btn-blauw" style="flex:2" onclick="bewaarMelding()">💾 Melding opslaan</button>
+    </div>
+  </div>
+
+  <!-- LIJST -->
+  <div class="kaartje" id="lijstKaart" style="display:none">
+    <h2>Meldingen deze dienst</h2>
+    <div id="meldingLijst"></div>
+  </div>
+
+  <!-- RAPPORT -->
+  <div id="rapportBlok" style="display:none">
+    <button class="btn btn-wit" onclick="maakPDF(huidigeMeldingen(), dienst, false)">📄 Tussentijds rapport (PDF)</button>
+  </div>
+
+  <!-- ARCHIEF -->
+  <div class="kaartje" id="archiefKaart" style="display:none; margin-top:14px">
+    <h2>Afgeronde diensten</h2>
+    <div id="archiefLijst"></div>
+  </div>
+
+</div>
+
+<script>
+const { jsPDF } = window.jspdf;
+const LS = { meld:'piket_meldingen_v1', dienst:'piket_dienst_v1', arch:'piket_archief_v1', geo:'piket_geocache_v1', naam:'piket_naam_v1' };
+const SOORT_EM = {'Brand':'🔥','Voertuig in sloot':'🚗','Vloeistof op oppervlaktewater':'🛢️','Dode dieren in water':'🦆','Persleiding kapot':'🔧','Bentoniet uitbraak':'🕳️','Overige':'📋'};
+const PIKETMEDEWERKER = 'Remko Meijer'; // vaste piketmedewerker
+
+async function opslaanPDF(doc, filename){
+  try{
+    if(typeof claude === 'undefined' || !claude.use) throw new Error('geen-claude-runtime');
+    const downloads = await claude.use('downloads');
+    if(!downloads) throw new Error('geen-downloads-capability');
+    await downloads.save({ filename, data: doc.output('blob') });
+  }catch(e){
+    doc.save(filename); // werkt standaard in elke browser (bijv. GitHub Pages)
+  }
+}
+
+// Eigen bevestigings-/meldingvenster i.p.v. confirm()/alert(): die kunnen
+// geblokkeerd worden wanneer de app in een sandbox (zoals een artefact) draait.
+function toonModal(bericht, { bevestigen = false } = {}){
+  return new Promise(resolve=>{
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,30,40,.5);display:flex;align-items:center;justify-content:center;z-index:999;padding:20px';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#fff;border-radius:12px;padding:20px;max-width:340px;width:100%;box-shadow:0 12px 32px rgba(0,0,0,.25)';
+    const p = document.createElement('div');
+    p.style.cssText = 'font-size:15px;line-height:1.4;color:#1A2733;white-space:pre-line;margin-bottom:16px';
+    p.textContent = bericht;
+    box.appendChild(p);
+    const rij = document.createElement('div');
+    rij.style.cssText = 'display:flex;gap:8px';
+    function sluit(res){ document.body.removeChild(overlay); resolve(res); }
+    if(bevestigen){
+      const annuleer = document.createElement('button');
+      annuleer.className = 'btn btn-wit'; annuleer.style.flex = '1'; annuleer.textContent = 'Annuleren';
+      annuleer.onclick = () => sluit(false);
+      const ok = document.createElement('button');
+      ok.className = 'btn btn-blauw'; ok.style.flex = '1'; ok.textContent = 'Bevestigen';
+      ok.onclick = () => sluit(true);
+      rij.appendChild(annuleer); rij.appendChild(ok);
+    } else {
+      const ok = document.createElement('button');
+      ok.className = 'btn btn-blauw'; ok.style.flex = '1'; ok.textContent = 'OK';
+      ok.onclick = () => sluit(true);
+      rij.appendChild(ok);
+    }
+    box.appendChild(rij);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  });
+}
+
+let dienst = JSON.parse(localStorage.getItem(LS.dienst) || 'null');
+let meldingen = JSON.parse(localStorage.getItem(LS.meld) || '[]');
+let archief = JSON.parse(localStorage.getItem(LS.arch) || '[]');
+let editId = null;
+let formFotos = [];
+let formGPS = null;
+
+/* ---------- OFFLINE ---------- */
+function updOnline(){ document.getElementById('offlineBadge').style.display = navigator.onLine ? 'none' : 'inline-block'; }
+window.addEventListener('online', updOnline); window.addEventListener('offline', updOnline); updOnline();
+
+/* ---------- HELPERS ---------- */
+function opslaan(){
+  localStorage.setItem(LS.meld, JSON.stringify(meldingen));
+  localStorage.setItem(LS.dienst, JSON.stringify(dienst));
+  localStorage.setItem(LS.arch, JSON.stringify(archief));
+}
+function fdt(iso){ const d=new Date(iso); return d.toLocaleDateString('nl-NL',{weekday:'short',day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}); }
+function fdtLang(iso){ const d=new Date(iso); return d.toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+' om '+d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}); }
+function huidigeMeldingen(){ return meldingen; }
+function nuLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); }
+
+/* ---------- DIENST ---------- */
+async function wisselDienst(){
+  if(!dienst || !dienst.actief){
+    dienst = { actief:true, start:new Date().toISOString(), naam: PIKETMEDEWERKER };
+    meldingen = [];
+    opslaan(); render();
+  } else {
+    const ok = await toonModal('Piketdienst beëindigen?\n\nEr wordt een PDF-weekrapportage gemaakt en de dienst wordt gearchiveerd.', { bevestigen: true });
+    if(!ok) return;
+    const eind = new Date().toISOString();
+    maakPDF(meldingen, dienst, true, eind);
+    archief.unshift({ start:dienst.start, eind:eind, naam:dienst.naam, meldingen:meldingen });
+    if(archief.length > 12){
+      // Oudste diensten opschonen om localStorage-ruimte te bewaken
+      archief = archief.slice(0,12);
+    }
+    dienst = { actief:false };
+    meldingen = [];
+    opslaan(); render();
+  }
+}
+
+/* ---------- FORMULIER ---------- */
+function openForm(melding){
+  editId = melding ? melding.id : null;
+  formFotos = melding ? [...melding.fotos] : [];
+  formGPS = melding ? (melding.gps || null) : null;
+  document.getElementById('formTitel').textContent = editId ? 'Melding bewerken' : 'Nieuwe melding';
+  document.getElementById('mTijd').value = melding ? melding.tijd : nuLocal();
+  document.getElementById('mLocatie').value = melding ? melding.locatie : '';
+  document.getElementById('mActie').value = melding ? melding.actie : '';
+  document.getElementById('overigeVeld').value = melding ? (melding.overige||'') : '';
+  document.getElementById('mContact').value = melding ? (melding.contact||'') : '';
+  document.getElementById('mContactTel').value = melding ? (melding.contactTel||'') : '';
+  document.getElementById('mVeroorzakerInfo').value = melding ? (melding.veroorzakerInfo||'') : '';
+  document.getElementById('mVerontreiniging').checked = melding ? !!melding.verontreiniging : false;
+  document.getElementById('mOpschalingNaam').value = melding ? (melding.opschalingNaam||'') : '';
+  zetSoort(melding ? melding.soort : null);
+  zetGrip(melding ? (melding.grip||'') : '');
+  zetOpschaling(melding ? (melding.opschaling||'') : '');
+  zetMelder(melding ? melding.melder : null);
+  zetVeroorzaker(melding ? (melding.veroorzaker||null) : null);
+  zetStatus(melding ? melding.status : 'open');
+  toonGpsInfo();
+  renderFormFotos();
+  document.getElementById('meldFormWrap').style.display = 'block';
+  document.getElementById('nieuwKnop').style.display = 'none';
+  document.getElementById('meldFormWrap').scrollIntoView({behavior:'smooth'});
+}
+function sluitForm(){
+  document.getElementById('meldFormWrap').style.display = 'none';
+  if(dienst && dienst.actief) document.getElementById('nieuwKnop').style.display = 'block';
+  editId = null; formFotos = []; formGPS = null; selOpschaling = '';
+}
+
+let selSoort=null, selGrip='', selOpschaling='', selMelder=null, selVeroorzaker=null, selStatus='open';
+function zetSoort(s){
+  selSoort = s;
+  document.querySelectorAll('#soortTegels .tegel').forEach(t=>t.classList.toggle('aan', t.dataset.soort===s));
+  document.getElementById('overigeVeld').style.display = s==='Overige' ? 'block' : 'none';
+  document.getElementById('opschalingBlok').style.display = s==='Brand' ? 'block' : 'none';
+}
+function zetGrip(g){
+  selGrip = g===null ? '' : g;
+  document.querySelectorAll('.gripknop').forEach(k=>k.classList.toggle('aan', k.dataset.grip===selGrip));
+  const isGrip = selGrip !== '';
+  document.getElementById('gripHint').style.display = isGrip ? 'block' : 'none';
+  document.getElementById('contactLabel').textContent = isGrip ? 'Officier van Dienst / CoPI-leider' : 'Gesproken met';
+  document.getElementById('mContact').placeholder = isGrip ? 'Naam OvD (vaak brandweer)...' : 'Naam en functie...';
+}
+function zetOpschaling(o){
+  selOpschaling = o||'';
+  document.querySelectorAll('#opschalingRij .melderknop').forEach(k=>k.classList.toggle('aan', k.dataset.opschaling===selOpschaling));
+  document.getElementById('mOpschalingNaam').style.display = selOpschaling ? 'block' : 'none';
+}
+function zetMelder(m){ selMelder = m; document.querySelectorAll('#melderRij .melderknop').forEach(k=>k.classList.toggle('aan', k.dataset.melder===m)); }
+function zetVeroorzaker(v){
+  selVeroorzaker = v;
+  document.querySelectorAll('#veroorzakerRij .melderknop').forEach(k=>k.classList.toggle('aan', k.dataset.ver===v));
+  document.getElementById('mVeroorzakerInfo').style.display = v ? 'block' : 'none';
+}
+function zetStatus(s){ selStatus = s; document.querySelectorAll('.statusknop').forEach(k=>k.classList.toggle('aan', k.dataset.status===s)); }
+
+document.getElementById('soortTegels').addEventListener('click', e=>{ const t=e.target.closest('.tegel'); if(t) zetSoort(t.dataset.soort); });
+document.getElementById('gripRij').addEventListener('click', e=>{ const k=e.target.closest('.gripknop'); if(k) zetGrip(k.dataset.grip); });
+document.getElementById('opschalingRij').addEventListener('click', e=>{ const k=e.target.closest('.melderknop'); if(k) zetOpschaling(k.dataset.opschaling); });
+document.getElementById('melderRij').addEventListener('click', e=>{ const k=e.target.closest('.melderknop'); if(k) zetMelder(k.dataset.melder); });
+document.getElementById('veroorzakerRij').addEventListener('click', e=>{
+  const k=e.target.closest('.melderknop'); if(!k) return;
+  zetVeroorzaker(selVeroorzaker===k.dataset.ver ? null : k.dataset.ver); // nogmaals tikken = deselecteren
+});
+document.querySelectorAll('.statusknop').forEach(k=>k.addEventListener('click', ()=>zetStatus(k.dataset.status)));
+
+/* ---------- GPS + NOMINATIM ---------- */
+function pakGPS(){
+  const knop = document.getElementById('gpsKnop');
+  knop.disabled = true; knop.textContent = '⏳';
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    formGPS = { lat:+pos.coords.latitude.toFixed(6), lon:+pos.coords.longitude.toFixed(6) };
+    toonGpsInfo();
+    const adres = await reverseGeo(formGPS.lat, formGPS.lon);
+    if(adres && !document.getElementById('mLocatie').value.trim()){
+      document.getElementById('mLocatie').value = adres;
+    }
+    knop.disabled = false; knop.textContent = '📍 GPS';
+  }, err=>{
+    toonModal('GPS niet beschikbaar: '+err.message);
+    knop.disabled = false; knop.textContent = '📍 GPS';
+  }, {enableHighAccuracy:true, timeout:12000});
+}
+function toonGpsInfo(){
+  document.getElementById('gpsInfo').textContent = formGPS ? `GPS vastgelegd: ${formGPS.lat}, ${formGPS.lon}` : '';
+}
+async function reverseGeo(lat, lon){
+  const sleutel = lat.toFixed(4)+','+lon.toFixed(4);
+  const cache = JSON.parse(localStorage.getItem(LS.geo) || '{}');
+  if(cache[sleutel]) return cache[sleutel];
+  if(!navigator.onLine) return null;
+  try{
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=17&accept-language=nl`);
+    const j = await r.json();
+    const a = j.address || {};
+    const adres = [ [a.road, a.house_number].filter(Boolean).join(' '), a.village||a.town||a.city||a.municipality ].filter(Boolean).join(', ');
+    if(adres){ cache[sleutel]=adres; localStorage.setItem(LS.geo, JSON.stringify(cache)); }
+    return adres || null;
+  }catch(e){ return null; }
+}
+
+/* ---------- FOTO'S ---------- */
+function fotosToevoegen(files){
+  [...files].forEach(f=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const max = 800;
+      let w=img.width, h=img.height;
+      if(w>max||h>max){ const s=max/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
+      const c = document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      formFotos.push(c.toDataURL('image/jpeg',0.55));
+      URL.revokeObjectURL(img.src);
+      renderFormFotos();
+    };
+    img.src = URL.createObjectURL(f);
+  });
+  document.getElementById('fotoInput').value = '';
+}
+function renderFormFotos(){
+  document.getElementById('fotoRij').innerHTML = formFotos.map((f,i)=>
+    `<div class="thumb"><img src="${f}"><button class="weg" onclick="formFotos.splice(${i},1);renderFormFotos()">✕</button></div>`).join('');
+}
+
+/* ---------- MELDING OPSLAAN ---------- */
+function bewaarMelding(){
+  if(!selSoort){ toonModal('Kies eerst een soort incident.'); return; }
+  if(selSoort==='Brand' && selGrip===null){ selGrip=''; }
+  const m = {
+    id: editId || Date.now(),
+    tijd: document.getElementById('mTijd').value || nuLocal(),
+    soort: selSoort,
+    grip: selGrip,
+    overige: selSoort==='Overige' ? document.getElementById('overigeVeld').value.trim() : '',
+    locatie: document.getElementById('mLocatie').value.trim(),
+    gps: formGPS,
+    melder: selMelder || '',
+    contact: document.getElementById('mContact').value.trim(),
+    contactTel: document.getElementById('mContactTel').value.trim(),
+    opschaling: selOpschaling || '',
+    opschalingNaam: selOpschaling ? document.getElementById('mOpschalingNaam').value.trim() : '',
+    veroorzaker: selVeroorzaker || '',
+    veroorzakerInfo: document.getElementById('mVeroorzakerInfo').value.trim(),
+    verontreiniging: document.getElementById('mVerontreiniging').checked,
+    actie: document.getElementById('mActie').value.trim(),
+    status: selStatus,
+    fotos: formFotos
+  };
+  try{
+    if(editId){ meldingen = meldingen.map(x=>x.id===editId ? m : x); }
+    else { meldingen.push(m); }
+    opslaan();
+  }catch(e){
+    toonModal('Opslaan mislukt — waarschijnlijk is de opslag vol.\nVerwijder foto\'s of oude diensten in het archief en probeer opnieuw.');
+    return;
+  }
+  sluitForm(); render();
+}
+function wisselStatus(id){
+  meldingen = meldingen.map(m=>m.id===id ? {...m, status:m.status==='open'?'afgehandeld':'open'} : m);
+  opslaan(); render();
+}
+async function verwijderMelding(id){
+  const ok = await toonModal('Melding verwijderen?', { bevestigen: true });
+  if(!ok) return;
+  meldingen = meldingen.filter(m=>m.id!==id);
+  opslaan(); render();
+}
+function bewerkMelding(id){ openForm(meldingen.find(m=>m.id===id)); }
+
+/* ---------- RENDER ---------- */
+function soortLabel(m){
+  let s = m.soort;
+  if(m.soort==='Overige' && m.overige) s += ': '+m.overige;
+  if(m.grip) s += ' — '+m.grip;
+  return s;
+}
+function render(){
+  const band = document.getElementById('dienstband');
+  const actief = dienst && dienst.actief;
+  band.classList.toggle('actief', !!actief);
+  document.getElementById('dienstKnop').textContent = actief ? '⏹ Einde dienst + rapportage' : '▶ Start piketdienst';
+  document.getElementById('dienstKnop').className = 'btn ' + (actief ? 'btn-oranje' : 'btn-blauw');
+  document.getElementById('dienstStatus').textContent = actief ? '✓ Piketdienst actief — '+dienst.naam : 'Geen actieve piketdienst';
+  document.getElementById('dienstSub').textContent = actief ? 'Gestart: '+fdtLang(dienst.start) : 'Start je dienst om meldingen te registreren (ma t/m ma).';
+  document.getElementById('dienstTellers').style.display = actief ? 'flex' : 'none';
+  document.getElementById('nieuwKnop').style.display = actief && document.getElementById('meldFormWrap').style.display!=='block' ? 'block' : 'none';
+  document.getElementById('lijstKaart').style.display = actief && meldingen.length ? 'block' : 'none';
+  document.getElementById('rapportBlok').style.display = actief && meldingen.length ? 'block' : 'none';
+  if(!actief) sluitForm();
+
+  document.getElementById('tTotaal').textContent = meldingen.length;
+  document.getElementById('tOpen').textContent = meldingen.filter(m=>m.status==='open').length;
+  document.getElementById('tDicht').textContent = meldingen.filter(m=>m.status==='afgehandeld').length;
+
+  const lijst = [...meldingen].sort((a,b)=>b.tijd.localeCompare(a.tijd));
+  document.getElementById('meldingLijst').innerHTML = lijst.map(m=>`
+    <div class="melding ${m.status==='open'?'isopen':''}">
+      <div class="kop">
+        <div>
+          <div class="soort">${SOORT_EM[m.soort]||''} ${soortLabel(m)}</div>
+          <div class="tijd">${fdt(m.tijd)}</div>
+        </div>
+        <span class="badge ${m.status==='open'?'open':'dicht'}">${m.status==='open'?'⚠ OPEN':'✓ AFGEHANDELD'}</span>
+      </div>
+      ${m.locatie||m.gps ? `<div class="regel"><b>Locatie</b><br>${m.locatie||''}${m.gps?` <span style="color:var(--grijs);font-size:12px">(${m.gps.lat}, ${m.gps.lon})</span>`:''}</div>`:''}
+      ${m.melder ? `<div class="regel"><b>Gemeld door</b><br>${m.melder}</div>`:''}
+      ${m.contact ? `<div class="regel"><b>${m.grip?'OvD / CoPI-leider':'Gesproken met'}</b><br>${m.contact}${m.contactTel?' — '+m.contactTel:''}</div>`:''}
+      ${m.opschaling ? `<div class="regel"><b>Opschaling</b><br>${m.opschaling}${m.opschalingNaam?' — '+m.opschalingNaam:''}</div>`:''}
+      ${m.veroorzaker ? `<div class="regel"><b>Veroorzaker</b><br>${m.veroorzaker}${m.veroorzakerInfo?' — '+m.veroorzakerInfo:''}</div>`:''}
+      ${m.verontreiniging ? `<div class="regel" style="color:var(--rood); font-weight:800">⚠ VERONTREINIGING OPPERVLAKTEWATER — veroorzaker herstelt schade</div>`:''}
+      ${m.actie ? `<div class="regel"><b>Actie</b><br>${m.actie}</div>`:''}
+      ${m.fotos.length ? `<div class="minifotos">${m.fotos.map(f=>`<img src="${f}">`).join('')}</div>`:''}
+      <div class="acties">
+        <button class="${m.status==='open'?'afh':'her'}" onclick="wisselStatus(${m.id})">${m.status==='open'?'✓ Afhandelen':'⚠ Heropen'}</button>
+        <button onclick="bewerkMelding(${m.id})">✏ Bewerken</button>
+        <button onclick="maakMeldingPDF(${m.id})">📄 PDF</button>
+        <button class="del" style="flex:0 0 46px" onclick="verwijderMelding(${m.id})">🗑</button>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('archiefKaart').style.display = archief.length ? 'block' : 'none';
+  document.getElementById('archiefLijst').innerHTML = archief.map((a,i)=>`
+    <div class="archiefitem">
+      <div><b>${new Date(a.start).toLocaleDateString('nl-NL')} – ${new Date(a.eind).toLocaleDateString('nl-NL')}</b><br>
+      <span style="color:var(--grijs);font-size:12px">${a.meldingen.length} melding(en) — ${a.naam}</span></div>
+      <div class="knopjes">
+        <button onclick="maakPDF(archief[${i}].meldingen, {naam:archief[${i}].naam, start:archief[${i}].start}, true, archief[${i}].eind)">📄 PDF</button>
+        <button class="del" onclick="verwijderArchief(${i})">🗑</button>
+      </div>
+    </div>`).join('');
+}
+async function verwijderArchief(i){
+  const ok = await toonModal('Deze dienst definitief verwijderen uit het archief?', { bevestigen: true });
+  if(!ok) return;
+  archief.splice(i,1); opslaan(); render();
+}
+
+/* ---------- PDF PER MELDING ---------- */
+function maakMeldingPDF(id){
+  const m = meldingen.find(x=>x.id===id);
+  if(!m) return;
+  const doc = new jsPDF();
+  const B = [11,79,138], O = [224,120,0], GB = [0,114,178], GR = [91,107,122], R = [176,48,15];
+  const paginaB = 210, marge = 15, breed = paginaB - 2*marge;
+
+  // Kop
+  doc.setFillColor(...B); doc.rect(0,0,paginaB,26,'F');
+  doc.setTextColor(255); doc.setFontSize(15); doc.setFont('helvetica','bold');
+  doc.text('PIKETMELDING', marge, 11);
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.text('Waterschap Noorderzijlvest', marge, 18);
+  doc.setFontSize(8);
+  doc.text('Individueel meldingsrapport', paginaB-marge, 11, {align:'right'});
+  let y = 36;
+
+  // Titel + status (kleurenblind-veilig: woord + symbool)
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(30);
+  doc.text(soortLabel(m), marge, y);
+  doc.setFontSize(10);
+  if(m.status==='open'){ doc.setTextColor(...O); doc.text('! OPEN', paginaB-marge, y, {align:'right'}); }
+  else { doc.setTextColor(...GB); doc.text('AFGEHANDELD', paginaB-marge, y, {align:'right'}); }
+  y += 6;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...GR);
+  doc.text(fdtLang(m.tijd), marge, y); y += 9;
+
+  if(m.grip){
+    doc.setFillColor(255,243,224); doc.setDrawColor(...O);
+    doc.roundedRect(marge, y-4, breed, 10, 2, 2, 'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...O);
+    doc.text(`! ${m.grip} — aanwezigheid waterschap verplicht`, marge+4, y+2.5);
+    y += 12;
+  }
+
+  const velden = [];
+  if(m.locatie) velden.push(['Locatie', m.locatie]);
+  if(m.gps) velden.push(['GPS', `${m.gps.lat}, ${m.gps.lon}`]);
+  if(m.melder) velden.push(['Gemeld door', m.melder]);
+  if(m.contact) velden.push([m.grip ? 'OvD / CoPI-leider' : 'Gesproken met', m.contact + (m.contactTel ? ' — '+m.contactTel : '')]);
+  if(m.opschaling) velden.push(['Opschaling', m.opschaling + (m.opschalingNaam ? ' — '+m.opschalingNaam : '')]);
+  if(m.veroorzaker) velden.push(['Veroorzaker', m.veroorzaker + (m.veroorzakerInfo ? ' — '+m.veroorzakerInfo : '')]);
+  if(m.actie) velden.push(['Actie / notitie', m.actie]);
+  velden.push(['Piketmedewerker', (dienst && dienst.naam) || PIKETMEDEWERKER]);
+
+  doc.setFontSize(10);
+  velden.forEach(([k,v])=>{
+    const w = doc.splitTextToSize(v, breed-48);
+    doc.setFont('helvetica','bold'); doc.setTextColor(...GR); doc.text(k+':', marge, y);
+    doc.setFont('helvetica','normal'); doc.setTextColor(30); doc.text(w, marge+45, y);
+    y += w.length*5.2 + 3;
+  });
+
+  if(m.verontreiniging){
+    y += 2;
+    doc.setDrawColor(...R); doc.setFillColor(253,236,232);
+    doc.roundedRect(marge, y-4, breed, 12, 2, 2, 'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...R);
+    doc.text('LET OP: Verontreiniging oppervlaktewater', marge+4, y+1);
+    doc.setFontSize(9);
+    doc.text('Veroorzaker moet de schade herstellen.', marge+4, y+6);
+    y += 16;
+  }
+
+  // Foto's groot, 2 per rij
+  if(m.fotos.length){
+    y += 3;
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...B);
+    doc.text("FOTO'S", marge, y); y += 5;
+    const fw = (breed-6)/2, fh = fw*0.75;
+    m.fotos.forEach((f,i)=>{
+      const kol = i % 2;
+      if(kol===0 && y + fh > 280){ doc.addPage(); y = 20; }
+      try{ doc.addImage(f, 'JPEG', marge + kol*(fw+6), y, fw, fh); }catch(e){}
+      if(kol===1 || i===m.fotos.length-1) y += fh + 6;
+    });
+  }
+
+  const n = doc.getNumberOfPages();
+  for(let p=1;p<=n;p++){
+    doc.setPage(p);
+    doc.setFontSize(8); doc.setTextColor(...GR); doc.setFont('helvetica','normal');
+    doc.text(`Pagina ${p} van ${n}`, paginaB-marge, 291, {align:'right'});
+    doc.text('Piket App NZV', marge, 291);
+  }
+
+  const dstr = m.tijd.slice(0,10).replace(/-/g,'');
+  const naam = m.soort.replace(/[^a-zA-Z]/g,'').slice(0,12);
+  opslaanPDF(doc, `Piketmelding_${naam}_${dstr}.pdf`);
+}
+
+/* ---------- PDF RAPPORT ---------- */
+function maakPDF(lijst, d, eindrapport, eindIso){
+  const doc = new jsPDF();
+  const B = [11,79,138], O = [224,120,0], GB = [0,114,178], GR = [91,107,122];
+  const paginaB = 210, marge = 15, breed = paginaB - 2*marge;
+  let y = 0;
+
+  function kop(){
+    doc.setFillColor(...B); doc.rect(0,0,paginaB,26,'F');
+    doc.setTextColor(255); doc.setFontSize(15); doc.setFont('helvetica','bold');
+    doc.text('PIKETRAPPORTAGE', marge, 11);
+    doc.setFontSize(9); doc.setFont('helvetica','normal');
+    doc.text('Waterschap Noorderzijlvest', marge, 18);
+    doc.setTextColor(255); doc.setFontSize(8);
+    doc.text(eindrapport ? 'Eindrapport dienst' : 'Tussentijds overzicht', paginaB-marge, 11, {align:'right'});
+    y = 34;
+  }
+  function nieuwePagina(nodig){
+    if(y + nodig > 282){ doc.addPage(); kop(); }
+  }
+  kop();
+
+  const eind = eindIso || new Date().toISOString();
+  doc.setTextColor(30); doc.setFontSize(10); doc.setFont('helvetica','normal');
+  doc.text(`Piketmedewerker: ${d.naam||'-'}`, marge, y); y+=5.5;
+  doc.text(`Periode: ${new Date(d.start).toLocaleString('nl-NL',{dateStyle:'full',timeStyle:'short'})}`, marge, y); y+=5.5;
+  doc.text(`         t/m ${new Date(eind).toLocaleString('nl-NL',{dateStyle:'full',timeStyle:'short'})}`, marge, y); y+=5.5;
+  doc.text(`Rapport gegenereerd: ${new Date().toLocaleString('nl-NL',{dateStyle:'short',timeStyle:'short'})}`, marge, y); y+=9;
+
+  /* Samenvatting */
+  doc.setFillColor(232,241,250); doc.setDrawColor(...B);
+  const soorten = ['Brand','Voertuig in sloot','Vloeistof op oppervlaktewater','Dode dieren in water','Persleiding kapot','Bentoniet uitbraak','Overige'];
+  const telling = {};
+  soorten.forEach(s=> telling[s] = lijst.filter(m=>m.soort===s).length);
+  const gripT = {};
+  lijst.filter(m=>m.grip).forEach(m=> gripT[m.grip]=(gripT[m.grip]||0)+1);
+  const nOpen = lijst.filter(m=>m.status==='open').length;
+  const nDicht = lijst.length - nOpen;
+
+  const samenH = 10 + 6*soorten.length + (Object.keys(gripT).length?6:0) + 10;
+  doc.roundedRect(marge, y, breed, samenH, 2, 2, 'FD');
+  let sy = y+7;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...B);
+  doc.text('SAMENVATTING', marge+4, sy); sy+=7;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(30);
+  soorten.forEach(s=>{
+    doc.text(`${s}`, marge+4, sy);
+    doc.setFont('helvetica','bold'); doc.text(String(telling[s]), marge+breed-8, sy, {align:'right'}); doc.setFont('helvetica','normal');
+    sy+=6;
+  });
+  if(Object.keys(gripT).length){
+    doc.setTextColor(...O);
+    doc.text('  waarvan GRIP-meldingen: '+Object.entries(gripT).map(([g,n])=>`${g} (${n}x)`).join(', '), marge+4, sy); sy+=6;
+    doc.setTextColor(30);
+  }
+  doc.setFont('helvetica','bold');
+  doc.text(`Totaal: ${lijst.length}   |   Open: ${nOpen}   |   Afgehandeld: ${nDicht}`, marge+4, sy);
+  y += samenH + 9;
+
+  /* Meldingen chronologisch */
+  const chrono = [...lijst].sort((a,b)=>a.tijd.localeCompare(b.tijd));
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(...B);
+  nieuwePagina(12);
+  doc.text('MELDINGEN', marge, y); y+=7;
+
+  chrono.forEach((m,i)=>{
+    const regels = [];
+    if(m.locatie) regels.push(['Locatie', m.locatie + (m.gps?`  (GPS: ${m.gps.lat}, ${m.gps.lon})`:'')]);
+    else if(m.gps) regels.push(['Locatie', `GPS: ${m.gps.lat}, ${m.gps.lon}`]);
+    if(m.melder) regels.push(['Gemeld door', m.melder]);
+    if(m.contact) regels.push([m.grip ? 'OvD / CoPI-leider' : 'Gesproken met', m.contact + (m.contactTel ? ' — '+m.contactTel : '')]);
+    if(m.opschaling) regels.push(['Opschaling', m.opschaling + (m.opschalingNaam ? ' — '+m.opschalingNaam : '')]);
+    if(m.veroorzaker) regels.push(['Veroorzaker', m.veroorzaker + (m.veroorzakerInfo ? ' — '+m.veroorzakerInfo : '')]);
+    if(m.verontreiniging) regels.push(['LET OP', 'Verontreiniging oppervlaktewater — veroorzaker moet schade herstellen']);
+    if(m.actie) regels.push(['Actie / notitie', m.actie]);
+
+    let hoogte = 14;
+    const wraps = regels.map(([k,v])=>{ const w = doc.splitTextToSize(v, breed-45); hoogte += w.length*4.8+2; return [k,w]; });
+    const fotoH = m.fotos.length ? 38 : 0;
+    hoogte += fotoH + 4;
+    nieuwePagina(hoogte);
+
+    const isOpen = m.status==='open';
+    doc.setDrawColor(...(isOpen?O:B)); doc.setLineWidth(1.2);
+    doc.line(marge, y-2, marge, y-2+hoogte-4);
+    doc.setLineWidth(0.2);
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor(30);
+    doc.text(`${i+1}. ${soortLabel(m)}`, marge+4, y+3);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GR);
+    doc.text(fdt(m.tijd), marge+4, y+8);
+    // status badge, kleurenblind-veilig: woord + symbool
+    doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    if(isOpen){ doc.setTextColor(...O); doc.text('! OPEN', paginaB-marge, y+3, {align:'right'}); }
+    else { doc.setTextColor(...GB); doc.text('AFGEHANDELD', paginaB-marge, y+3, {align:'right'}); }
+    let ry = y+13;
+    doc.setFontSize(9); doc.setTextColor(30);
+    wraps.forEach(([k,w])=>{
+      const alarm = k==='LET OP';
+      doc.setFont('helvetica','bold'); doc.setTextColor(...(alarm?[176,48,15]:GR)); doc.text(k+':', marge+4, ry);
+      doc.setFont('helvetica', alarm?'bold':'normal'); doc.setTextColor(...(alarm?[176,48,15]:[30,30,30]));
+      doc.text(w, marge+40, ry);
+      ry += w.length*4.8+2;
+    });
+    if(m.fotos.length){
+      let fx = marge+4;
+      m.fotos.slice(0,4).forEach(f=>{
+        try{ doc.addImage(f, 'JPEG', fx, ry, 42, 32); }catch(e){}
+        fx += 46;
+      });
+      ry += 36;
+    }
+    y = ry + 5;
+  });
+
+  if(!chrono.length){
+    doc.setFont('helvetica','italic'); doc.setFontSize(10); doc.setTextColor(...GR);
+    doc.text('Geen meldingen geregistreerd tijdens deze dienst.', marge, y);
+  }
+
+  /* Paginanummers */
+  const n = doc.getNumberOfPages();
+  for(let p=1;p<=n;p++){
+    doc.setPage(p);
+    doc.setFontSize(8); doc.setTextColor(...GR); doc.setFont('helvetica','normal');
+    doc.text(`Pagina ${p} van ${n}`, paginaB-marge, 291, {align:'right'});
+    doc.text('Piket App NZV', marge, 291);
+  }
+
+  const dstr = new Date(d.start).toLocaleDateString('nl-NL').replace(/-/g,'');
+  opslaanPDF(doc, `Piketrapportage_${dstr}.pdf`);
+}
+
+/* ---------- INIT ---------- */
+render();
+</script>
+</body>
+</html>
